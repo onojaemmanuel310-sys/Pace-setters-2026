@@ -39,6 +39,7 @@ export function DashboardView({
   const [profilePhotoUrl, setProfilePhotoUrl] = useState(
     profile.profile_photo_url || ""
   );
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [showPhone, setShowPhone] = useState(
     Boolean(profile.privacy_settings?.show_phone)
   );
@@ -82,6 +83,73 @@ export function DashboardView({
     Boolean(profile.profile_photo_url),
     photos.length > 0,
   ].filter(Boolean).length * 20;
+
+  async function handleAvatarFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setProfileMsg({
+        text: "Please select an image file (PNG, JPG, or WEBP).",
+        type: "error",
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileMsg({
+        text: "Image size must be less than 5MB.",
+        type: "error",
+      });
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+      setProfileMsg(null);
+      const supabase = createClient();
+
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${profile.user_id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(fileName);
+
+      const publicUrl = urlData.publicUrl;
+      setProfilePhotoUrl(publicUrl);
+
+      // Immediately save avatar to profile
+      const { data, error: updateError } = await supabase
+        .from("graduate_profiles")
+        .update({ profile_photo_url: publicUrl })
+        .eq("user_id", profile.user_id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      setProfile(data);
+
+      setProfileMsg({
+        text: "Profile picture uploaded and saved successfully!",
+        type: "success",
+      });
+    } catch (err: unknown) {
+      console.error("Avatar upload error:", err);
+      setProfileMsg({
+        text: err instanceof Error ? err.message : "Failed to upload photo from gallery.",
+        type: "error",
+      });
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
 
   async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -463,15 +531,67 @@ export function DashboardView({
               </div>
 
               <div className="form-field">
-                <label htmlFor="p_avatar">Profile Photo / Avatar URL</label>
-                <input
-                  id="p_avatar"
-                  type="url"
-                  placeholder="https://... (Direct link to your portrait)"
-                  value={profilePhotoUrl}
-                  onChange={(e) => setProfilePhotoUrl(e.target.value)}
-                  disabled={savingProfile}
-                />
+                <label>Profile Picture / Portrait</label>
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap", marginTop: "0.5rem" }}>
+                  {profilePhotoUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={profilePhotoUrl}
+                      alt="Avatar Preview"
+                      style={{
+                        width: "68px",
+                        height: "68px",
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                        border: "2px solid var(--gold-champagne)",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: "68px",
+                        height: "68px",
+                        borderRadius: "50%",
+                        backgroundColor: "#1f1f1f",
+                        border: "2px dashed #444",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "1.5rem",
+                      }}
+                    >
+                      👤
+                    </div>
+                  )}
+
+                  <label
+                    style={{
+                      cursor: avatarUploading ? "not-allowed" : "pointer",
+                      padding: "0.6rem 1.2rem",
+                      backgroundColor: "var(--gold-champagne, #D6B56D)",
+                      color: "#0B0B0B",
+                      fontWeight: 600,
+                      borderRadius: "6px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      fontSize: "0.9rem",
+                    }}
+                  >
+                    {avatarUploading ? "Uploading..." : "📷 Choose from Gallery"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarFileSelect}
+                      disabled={avatarUploading || savingProfile}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+
+                  <small style={{ color: "#888", display: "block", width: "100%" }}>
+                    Choose any photo from your phone or PC (Max 5MB). Uploads automatically!
+                  </small>
+                </div>
               </div>
             </div>
 
