@@ -12,6 +12,7 @@ export default async function HomePage() {
   let featuredGraduates: GraduateProfile[] = [];
   let previewMemories: GraduateMemory[] = [];
   let recentPhotos: GraduatePhoto[] = [];
+  let officialClassPhotoUrl: string | null = null;
   let isConfigured = false;
 
   if (isSupabaseConfigured()) {
@@ -78,6 +79,16 @@ export default async function HomePage() {
         .order("created_at", { ascending: false })
         .limit(6);
       if (photosData) recentPhotos = photosData as GraduatePhoto[];
+
+      // 8. Official Class Graduation Portrait from site_settings
+      const { data: settingData } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "official_graduation_photo")
+        .maybeSingle();
+      if (settingData?.value) {
+        officialClassPhotoUrl = settingData.value;
+      }
     } catch (err) {
       console.warn("Supabase load notice:", err);
     }
@@ -121,18 +132,33 @@ export default async function HomePage() {
           </div>
 
           <div className="hero-visual-col">
-            <div className="yearbook-frame-placeholder">
-              <div className="frame-inner-border">
-                <div className="placeholder-crest">
-                  <span className="crest-year">2026</span>
-                  <span className="crest-title">PACE SETTERS</span>
-                  <p className="frame-caption">
-                    Official Graduation Photography Frame
-                    <br />
-                    <small>(Awaiting Class Convocation Portrait)</small>
-                  </p>
+            <div className="yearbook-frame-placeholder" style={{ padding: officialClassPhotoUrl ? "8px" : "14px" }}>
+              {officialClassPhotoUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={officialClassPhotoUrl}
+                  alt="Official Class of 2026 Graduation Portrait"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    borderRadius: "4px",
+                    border: "1px solid var(--border-gold)",
+                  }}
+                />
+              ) : (
+                <div className="frame-inner-border">
+                  <div className="placeholder-crest">
+                    <span className="crest-year">2026</span>
+                    <span className="crest-title">PACE SETTERS</span>
+                    <p className="frame-caption">
+                      Official Graduation Photography Frame
+                      <br />
+                      <small>(Awaiting Class Convocation Portrait)</small>
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

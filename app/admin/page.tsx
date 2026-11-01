@@ -91,6 +91,13 @@ export default async function AdminPage() {
     .select("*, graduate_profiles(full_name, department)")
     .order("created_at", { ascending: false });
 
+  // Current Official Graduation Photo
+  const { data: officialPhotoSetting } = await supabase
+    .from("site_settings")
+    .select("value")
+    .eq("key", "official_graduation_photo")
+    .maybeSingle();
+
   return (
     <div className="admin-page-container wrap">
       <AdminDashboardView
@@ -98,6 +105,7 @@ export default async function AdminPage() {
         initialProfiles={(allProfiles || []) as GraduateProfile[]}
         initialPhotos={(allPhotos || []) as unknown as GraduatePhoto[]}
         initialMemories={(allMemories || []) as unknown as GraduateMemory[]}
+        initialOfficialPhotoUrl={officialPhotoSetting?.value || null}
         adminUserId={user.id}
       />
     </div>

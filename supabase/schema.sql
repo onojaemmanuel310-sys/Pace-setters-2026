@@ -126,7 +126,15 @@ create table if not exists public.graduate_achievements (
   created_at timestamptz not null default timezone('utc'::text, now())
 );
 
--- G. ADMIN AUDIT LOGS (Security accountability)
+-- G. SITE SETTINGS (Key-value store for official class portrait, announcements, etc.)
+create table if not exists public.site_settings (
+  key text primary key,
+  value text,
+  updated_at timestamptz not null default timezone('utc'::text, now()),
+  updated_by uuid references auth.users(id) on delete set null
+);
+
+-- H. ADMIN AUDIT LOGS (Security accountability)
 create table if not exists public.admin_audit_logs (
   id uuid primary key default gen_random_uuid(),
   administrator_id uuid references auth.users(id) on delete set null,
@@ -254,6 +262,7 @@ alter table public.graduate_profiles enable row level security;
 alter table public.graduate_photos enable row level security;
 alter table public.graduate_memories enable row level security;
 alter table public.graduate_achievements enable row level security;
+alter table public.site_settings enable row level security;
 alter table public.admin_audit_logs enable row level security;
 
 -- Drop all existing table policies before recreating (safe re-run)
@@ -283,6 +292,9 @@ drop policy if exists "Achievement owners or admins can manage achievements" on 
 
 drop policy if exists "Only admins can view audit logs" on public.admin_audit_logs;
 drop policy if exists "System and admins can insert audit logs" on public.admin_audit_logs;
+
+drop policy if exists "Public can read site settings" on public.site_settings;
+drop policy if exists "Only admins can modify site settings" on public.site_settings;
 
 -- --- USER ROLES POLICIES ---
 create policy "Users can view their own role" on public.user_roles
@@ -402,6 +414,15 @@ create policy "System and admins can insert audit logs" on public.admin_audit_lo
 for insert to authenticated
 with check (public.is_admin());
 
+-- --- SITE SETTINGS POLICIES ---
+create policy "Public can read site settings" on public.site_settings
+for select using (true);
+
+create policy "Only admins can modify site settings" on public.site_settings
+for all to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
 -- ==============================================================================
 -- 6. STORAGE BUCKETS CONFIGURATION (Run in SQL or create in dashboard)
 -- ==============================================================================
@@ -414,21 +435,37 @@ insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
 on conflict (id) do nothing;
 
+insert into storage.buckets (id, name, public)
+values ('graduation_photos', 'graduation_photos', true)
+on conflict (id) do nothing;
+
 
 -- Storage RLS Policies (drop first to allow clean re-run)
 drop policy if exists "Public can view yearbook photos" on storage.objects;
 drop policy if exists "Approved members can upload yearbook photos" on storage.objects;
 drop policy if exists "Users can upload their own avatar" on storage.objects;
 drop policy if exists "Owners or admins can delete photos" on storage.objects;
+drop policy if exists "Admins can manage graduation photos bucket" on storage.objects;
 
 create policy "Public can view yearbook photos" on storage.objects
-for select using (bucket_id in ('yearbook_photos', 'avatars'));
+for select using (bucket_id in ('yearbook_photos', 'avatars', 'graduation_photos'));
 
 create policy "Approved members can upload yearbook photos" on storage.objects
 for insert to authenticated
 with check (
   bucket_id = 'yearbook_photos'
   and public.is_approved_graduate(auth.uid())
+);
+
+create policy "Admins can manage graduation photos bucket" on storage.objects
+for all to authenticated
+using (
+  bucket_id = 'graduation_photos'
+  and public.is_admin()
+)
+with check (
+  bucket_id = 'graduation_photos'
+  and public.is_admin()
 );
 
 create policy "Users can upload their own avatar" on storage.objects

@@ -15,6 +15,7 @@ interface AdminDashboardViewProps {
   initialProfiles: GraduateProfile[];
   initialPhotos: GraduatePhoto[];
   initialMemories: GraduateMemory[];
+  initialOfficialPhotoUrl?: string | null;
   adminUserId: string;
 }
 
@@ -23,6 +24,7 @@ export function AdminDashboardView({
   initialProfiles,
   initialPhotos,
   initialMemories,
+  initialOfficialPhotoUrl = null,
   adminUserId,
 }: AdminDashboardViewProps) {
   const [registrations, setRegistrations] = useState<GraduateRegistration[]>(
@@ -31,9 +33,17 @@ export function AdminDashboardView({
   const [profiles, setProfiles] = useState<GraduateProfile[]>(initialProfiles);
   const [photos, setPhotos] = useState<GraduatePhoto[]>(initialPhotos);
   const [memories, setMemories] = useState<GraduateMemory[]>(initialMemories);
+  const [officialPhotoUrl, setOfficialPhotoUrl] = useState<string | null>(
+    initialOfficialPhotoUrl
+  );
+  const [uploadingOfficial, setUploadingOfficial] = useState(false);
+  const [officialPhotoMsg, setOfficialPhotoMsg] = useState<{
+    text: string;
+    type: "success" | "error";
+  } | null>(null);
 
   const [activeTab, setActiveTab] = useState<
-    "overview" | "registrations" | "graduates" | "photos" | "memories"
+    "overview" | "registrations" | "graduates" | "photos" | "memories" | "settings"
   >("overview");
 
   const [filterStatus, setFilterStatus] = useState<string>("pending");
@@ -248,6 +258,72 @@ export function AdminDashboardView({
     }
   }
 
+  async function handleOfficialPhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setOfficialPhotoMsg({
+        text: "Please select an image file (PNG, JPG, or WEBP).",
+        type: "error",
+      });
+      return;
+    }
+
+    try {
+      setUploadingOfficial(true);
+      setOfficialPhotoMsg(null);
+      const supabase = createClient();
+
+      const fileExt = file.name.split(".").pop();
+      const fileName = `official-class-frame-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("graduation_photos")
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("graduation_photos")
+        .getPublicUrl(fileName);
+
+      const publicUrl = urlData.publicUrl;
+
+      // Update in site_settings table
+      const { error: upsertError } = await supabase
+        .from("site_settings")
+        .upsert(
+          {
+            key: "official_graduation_photo",
+            value: publicUrl,
+            updated_at: new Date().toISOString(),
+            updated_by: adminUserId,
+          },
+          { onConflict: "key" }
+        );
+
+      if (upsertError) throw upsertError;
+
+      setOfficialPhotoUrl(publicUrl);
+      setOfficialPhotoMsg({
+        text: "Official Graduation Photography Frame uploaded & updated on Homepage!",
+        type: "success",
+      });
+    } catch (err: unknown) {
+      console.error("Official photo upload error:", err);
+      setOfficialPhotoMsg({
+        text:
+          err instanceof Error
+            ? err.message
+            : "Failed to upload official photo. Ensure graduation_photos storage bucket is created.",
+        type: "error",
+      });
+    } finally {
+      setUploadingOfficial(false);
+    }
+  }
+
   const filteredRegistrations = registrations.filter((r) => {
     const matchesStatus =
       filterStatus === "all" || r.approval_status === filterStatus;
@@ -343,6 +419,13 @@ export function AdminDashboardView({
           type="button"
         >
           Memories Moderation ({memories.length})
+        </button>
+        <button
+          className={activeTab === "settings" ? "adm-tab active" : "adm-tab"}
+          onClick={() => setActiveTab("settings")}
+          type="button"
+        >
+          🎓 Official Graduation Photo
         </button>
       </div>
 
@@ -617,6 +700,85 @@ export function AdminDashboardView({
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: Official Graduation Photo Frame Settings */}
+      {activeTab === "settings" && (
+        <div className="admin-tab-panel">
+          <div className="overview-pane" style={{ maxWidth: "680px" }}>
+            <h3>Official Graduation Photography Frame</h3>
+            <p className="text-muted" style={{ fontSize: "14px", lineHeight: "1.6", marginBottom: "20px" }}>
+              Upload the official Class of 2026 convocation photograph or portrait directly from your phone or device. This image will replace the frame placeholder in the Hero section of the Homepage.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: "340px",
+                  aspectRatio: "4/5",
+                  backgroundColor: "#171717",
+                  border: "2px dashed var(--border-gold, #D6B56D)",
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
+                }}
+              >
+                {officialPhotoUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={officialPhotoUrl}
+                    alt="Official Class Frame Preview"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <div style={{ textAlign: "center", padding: "20px", color: "var(--muted-gray)" }}>
+                    <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "8px" }}>🎓</span>
+                    <p style={{ fontSize: "13px" }}>No official photo uploaded yet</p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    cursor: uploadingOfficial ? "not-allowed" : "pointer",
+                    padding: "10px 20px",
+                    backgroundColor: "var(--gold-champagne, #D6B56D)",
+                    color: "#0B0B0B",
+                    fontWeight: 700,
+                    borderRadius: "6px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  {uploadingOfficial ? "Uploading & Updating..." : "📷 Choose Official Photo from Gallery"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleOfficialPhotoUpload}
+                    disabled={uploadingOfficial}
+                    style={{ display: "none" }}
+                  />
+                </label>
+                <small style={{ color: "var(--muted-gray)", display: "block", marginTop: "8px" }}>
+                  Select from your mobile gallery or files. Automatically uploads to the graduation photos bucket and publishes to the homepage!
+                </small>
+              </div>
+
+              {officialPhotoMsg && (
+                <div className={`message-banner ${officialPhotoMsg.type}`} style={{ marginTop: "10px" }}>
+                  {officialPhotoMsg.text}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
