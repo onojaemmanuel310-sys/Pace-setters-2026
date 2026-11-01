@@ -142,8 +142,16 @@ export function DashboardView({
       });
     } catch (err: unknown) {
       console.error("Avatar upload error:", err);
+      let errorMsg = "Failed to upload photo from gallery.";
+      if (err && typeof err === "object") {
+        if ("message" in err && typeof (err as { message: unknown }).message === "string") {
+          errorMsg = (err as { message: string }).message;
+        } else if ("error" in err && typeof (err as { error: unknown }).error === "string") {
+          errorMsg = (err as { error: string }).error;
+        }
+      }
       setProfileMsg({
-        text: err instanceof Error ? err.message : "Failed to upload photo from gallery.",
+        text: `Upload failed: ${errorMsg}`,
         type: "error",
       });
     } finally {
