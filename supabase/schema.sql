@@ -336,8 +336,7 @@ create policy "Members can update their own profile" on public.graduate_profiles
 for update to authenticated
 using (auth.uid() = user_id or public.is_admin())
 with check (
-  (auth.uid() = user_id and is_approved = (select p.is_approved from public.graduate_profiles p where p.id = id))
-  or public.is_admin()
+  auth.uid() = user_id or public.is_admin()
 );
 
 -- --- GRADUATE PHOTOS POLICIES ---
