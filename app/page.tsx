@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { GraduateProfile, GraduateMemory } from "@/lib/supabase/types";
+import { GraduateProfile, GraduateMemory, GraduatePhoto } from "@/lib/supabase/types";
 
 export const revalidate = 0; // Fresh database statistics
 
@@ -11,6 +11,7 @@ export default async function HomePage() {
   let memoriesCount = 0;
   let featuredGraduates: GraduateProfile[] = [];
   let previewMemories: GraduateMemory[] = [];
+  let recentPhotos: GraduatePhoto[] = [];
   let isConfigured = false;
 
   if (isSupabaseConfigured()) {
@@ -67,6 +68,16 @@ export default async function HomePage() {
         .order("created_at", { ascending: false })
         .limit(3);
       if (memData) previewMemories = memData as unknown as GraduateMemory[];
+
+      // 7. Recent Yearbook Photos Preview (up to 6)
+      const { data: photosData } = await supabase
+        .from("graduate_photos")
+        .select("*")
+        .eq("is_removed", false)
+        .eq("is_approved", true)
+        .order("created_at", { ascending: false })
+        .limit(6);
+      if (photosData) recentPhotos = photosData as GraduatePhoto[];
     } catch (err) {
       console.warn("Supabase load notice:", err);
     }
@@ -256,7 +267,54 @@ export default async function HomePage() {
         )}
       </section>
 
-      {/* SECTION E: Community Invitation */}
+      {/* SECTION E: Yearbook Photos Showcase */}
+      <section className="photos-showcase wrap" id="yearbook-photos">
+        <div className="section-heading">
+          <div>
+            <div className="eyebrow">YEARBOOK VISUAL ARCHIVE</div>
+            <h2>
+              Moments & <em>Portraits</em>
+            </h2>
+          </div>
+          <Link className="text-link" href="/gallery">
+            Explore Full Gallery ↗
+          </Link>
+        </div>
+
+        {recentPhotos.length > 0 ? (
+          <div className="gallery-grid">
+            {recentPhotos.map((photo) => (
+              <div className="gallery-card" key={photo.id}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photo.image_url}
+                  alt={photo.caption || "Yearbook photograph"}
+                  className="gallery-image"
+                  loading="lazy"
+                />
+                {photo.caption && (
+                  <div className="gallery-caption">
+                    <p>{photo.caption}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state-panel">
+            <div className="empty-state-icon">📸</div>
+            <h3>No Photos Uploaded Yet</h3>
+            <p>
+              Photos uploaded by approved graduates will appear right here in our live class gallery showcase.
+            </p>
+            <Link className="button button-gold-sm" href="/dashboard">
+              Upload Your Photos ↗
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* SECTION F: Community Invitation */}
       <section className="manifesto" id="community-invite">
         <div className="wrap manifesto-inner">
           <div className="eyebrow">PERMANENT DIGITAL HERITAGE</div>
