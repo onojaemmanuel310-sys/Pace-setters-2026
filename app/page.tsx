@@ -282,19 +282,19 @@ export default async function HomePage() {
         </div>
 
         {recentPhotos.length > 0 ? (
-          <div className="gallery-grid">
+          <div className="yearbook-masonry-grid">
             {recentPhotos.map((photo) => (
-              <div className="gallery-card" key={photo.id}>
+              <div className="yearbook-photo-card" key={photo.id}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={photo.image_url}
                   alt={photo.caption || "Yearbook photograph"}
-                  className="gallery-image"
+                  className="yearbook-img"
                   loading="lazy"
                 />
                 {photo.caption && (
-                  <div className="gallery-caption">
-                    <p>{photo.caption}</p>
+                  <div className="photo-card-overlay">
+                    <p className="caption-text">{photo.caption}</p>
                   </div>
                 )}
               </div>

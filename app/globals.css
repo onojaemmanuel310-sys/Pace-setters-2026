@@ -586,8 +586,8 @@ h1 em, h2 em, .gold-text {
 
 .graduate-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 26px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 22px;
 }
 
 .graduate-card {
@@ -605,7 +605,8 @@ h1 em, h2 em, .gold-text {
 
 .card-media {
   position: relative;
-  aspect-ratio: 4/4.5;
+  aspect-ratio: 1/1;
+  max-height: 250px;
   background: radial-gradient(circle at center, #2a2215, #14120e 75%);
   display: flex;
   align-items: center;
@@ -847,18 +848,25 @@ h1 em, h2 em, .gold-text {
 
 .yearbook-masonry-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
 }
 
 .yearbook-photo-card {
   position: relative;
-  aspect-ratio: 4/5;
+  aspect-ratio: 1/1;
+  max-height: 260px;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
-  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  transition: transform 0.25s ease, border-color 0.25s ease;
+}
+
+.yearbook-photo-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-gold);
 }
 
 .yearbook-img {
